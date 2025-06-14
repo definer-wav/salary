@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: salary-app
+    env: python
+    plan: free
+    buildCommand: ""
+    startCommand: "python myapp.py"
+    autoDeploy: true
+    branch: main
