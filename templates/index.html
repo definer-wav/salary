@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Currency & Salary Tracker</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f0f0f3;
+      color: #333;
+    }
+    .container {
+      max-width: 800px;
+      margin: auto;
+      padding: 2rem;
+    }
+    h1 {
+      text-align: center;
+      color: #222;
+    }
+    section {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    }
+    label, select, input, button {
+      display: block;
+      margin-bottom: 1rem;
+      width: 100%;
+      font-size: 1rem;
+    }
+    button {
+      background-color: #4a4a4a;
+      color: white;
+      border: none;
+      padding: 0.75rem;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #333;
+    }
+    .calendar-day {
+      border: 1px solid #ccc;
+      padding: 1rem;
+      text-align: center;
+      cursor: pointer;
+      border-radius: 12px;
+      background-color: #eaeaea;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 1rem;
+    }
+    .output {
+      margin-top: 1rem;
+      font-weight: bold;
+      font-size: 1.2rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Currency & Salary Tracker</h1>
+
+    <section>
+      <h2>Currency Converter</h2>
+      <label for="from">From Currency</label>
+      <select id="from"></select>
+
+      <label for="to">To Currency</label>
+      <select id="to"></select>
+
+      <label for="amount">Amount</label>
+      <input type="number" id="amount" value="1" />
+
+      <button onclick="convertCurrency()">Convert</button>
+      <div id="conversionResult" class="output"></div>
+    </section>
+
+    <section>
+      <h2>Daily Salary Calculator</h2>
+      <label for="start">Start Hour (0-24)</label>
+      <input type="number" id="start" min="0" max="24" value="9" />
+
+      <label for="end">End Hour (0-24)</label>
+      <input type="number" id="end" min="0" max="24" value="17" />
+
+      <label for="rate">Hourly Rate</label>
+      <input type="number" id="rate" value="10" />
+
+      <button onclick="calculateSalary()">Calculate</button>
+      <div id="salaryResult" class="output"></div>
+    </section>
+
+    <section>
+      <h2>Monthly Calendar</h2>
+      <div class="grid" id="calendar"></div>
+      <button onclick="showSummary()">Show Monthly Total</button>
+      <div id="summaryResult" class="output"></div>
+    </section>
+  </div>
+
+  <script>
+    async function loadCurrencies() {
+      const res = await fetch('/api/currencies');
+      const currencies = await res.json();
+      const from = document.getElementById('from');
+      const to = document.getElementById('to');
+
+      from.innerHTML = to.innerHTML = '';
+      currencies.forEach(cur => {
+        const opt1 = document.createElement('option');
+        opt1.value = cur;
+        opt1.text = cur;
+        from.add(opt1);
+
+        const opt2 = document.createElement('option');
+        opt2.value = cur;
+        opt2.text = cur;
+        to.add(opt2);
+      });
+
+      from.value = 'CZK';
+      to.value = 'EUR';
+    }
+
+    async function convertCurrency() {
+      const from = document.getElementById('from').value;
+      const to = document.getElementById('to').value;
+      const amount = document.getElementById('amount').value;
+
+      const res = await fetch('/api/convert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from, to, amount })
+      });
+      const data = await res.json();
+      if (data.converted) {
+        document.getElementById('conversionResult').innerText = `${amount} ${from} = ${data.converted} ${to}`;
+      } else {
+        document.getElementById('conversionResult').innerText = 'Currency conversion failed.';
+      }
+    }
+
+    async function calculateSalary() {
+      const start = document.getElementById('start').value;
+      const end = document.getElementById('end').value;
+      const rate = document.getElementById('rate').value;
+
+      const res = await fetch('/api/salary/day', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start, end, rate })
+      });
+      const data = await res.json();
+      if (data.daily_salary) {
+        document.getElementById('salaryResult').innerText = `You worked ${data.hours} hour(s) and earned ${data.daily_salary}`;
+        loadCalendar();
+      } else {
+        document.getElementById('salaryResult').innerText = data.error || 'Failed to calculate salary';
+      }
+    }
+
+    async function loadCalendar() {
+      const res = await fetch('/api/salary/summary');
+      const data = await res.json();
+      const calendar = document.getElementById('calendar');
+      calendar.innerHTML = '';
+
+      Object.keys(data.days).forEach(day => {
+        const div = document.createElement('div');
+        div.className = 'calendar-day';
+        div.innerText = day;
+        div.onclick = async () => {
+          const res = await fetch(`/api/salary/${day}`);
+          const info = await res.json();
+          alert(`${day}\nStart: ${info.start}\nEnd: ${info.end}\nHours: ${info.hours}\nSalary: ${info.daily_salary}`);
+        };
+        calendar.appendChild(div);
+      });
+    }
+
+    async function showSummary() {
+      const res = await fetch('/api/salary/summary');
+      const data = await res.json();
+      document.getElementById('summaryResult').innerText = `Total this month: ${data.total_month}`;
+    }
+
+    loadCurrencies();
+    loadCalendar();
+  </script>
+</body>
+</html>
